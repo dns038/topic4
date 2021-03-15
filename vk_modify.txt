@@ -1,0 +1,84 @@
+-- Доработка БД vk
+
+-- 1. Исправление некооректных временных меток в таблице USERS
+UPDATE users SET updated_at = now() WHERE updated_at < created_at;
+
+--2. Обновляем поле genders в таблице profiles
+-- создаем временную таблицу и заполняем ее данными
+CREATE TEMPORARY TABLE genders (name char(1));
+INSERT INTO genders VALUES ('M'), ('F');
+
+--обновляем поле gender, вставляем в него случайные значения из временной таблицы genders
+UPDATE profiles SET gender = (SELECT name FROM genders ORDER BY RAND () LIMIT 1);
+
+--меняем тип данных в столбце gender на ENUM
+ALTER TABLE profiles MODIFY COLUMN gender ENUM ('M', 'F');
+
+--3. Заменяем значения в столбцах from_user_id и to_user_id в таблице messages на случайные
+UPDATE messages SET 
+from_user_id = FLOOR (1 + RAND() * 100),
+to_user_id = FLOOR (1 + RAND() * 100);
+
+--4. Улучшаем таблицу media
+-- Заполняем столбец user_id в таблице media случайными значениями
+update media SET user_id = FLOOR (1 + RAND() * 100);
+
+--создаем временную таблицу с расширениями файлов
+CREATE TEMPORARY TABLE extensions (name varchar(10));
+INSERT INTO extensions VALUES ('jpg'), ('mp4'), ('mp3'), ('avi'), ('png');
+
+--добавляем путь к файлам и расширения к именам в столбце filename
+UPDATE media SET filename = CONCAT(
+"http://dropbox.com/vk/" , 
+filename, 
+".", 
+(SELECT name FROM extensions ORDER BY RAND () LIMIT 1)
+) ;
+
+--меняем значения в столбце size
+UPDATE media SET SIZE = FLOOR (10000 + RAND() * 10000000) WHERE SIZE < 1000;
+
+--вставляем в столбец метадата имя владельца
+UPDATE media SET metadata = CONCAT(
+ '{"owner":"',
+ (SELECT CONCAT (first_name, ' ', last_name) FROM users WHERE id = user_id),
+ '"}') ;
+
+--меняем тип данных столбца metadata на JSON
+ALTER TABLE media MODIFY COLUMN metadata JSON;
+
+--5. Улучшаем таблицу mediafiles
+--удаляем строки
+TRUNCATE mediatypes;
+
+--вставляем новые значения
+INSERT INTO media_types (name) VALUES ('Video'), ('Photo'), ('Audio');
+
+--обновляем столбец media_type_id в таблице media
+UPDATE media SET media_type_id = FLOOR (1 + RAND() * 3);
+
+--6. Улучшаем таблицу friendship
+--удаляем столбец requested_at
+ALTER TABLE friendship DROP COLUMN requested_at;
+
+--обновляем значения в столбцах user_id и friend_id
+UPDATE friendship set user_id = FLOOR (1 + RAND() * 100),
+friend_id = flOOR (1 + RAND() * 100);
+
+--Обновляем таблицу friendship_statuses
+TRUNCATE friendship_statuses;
+INSERT INTO friendship_statuses (name) VALUES ('requested'), 
+('confirmed'),  ('rejected');
+
+--обновляем статусы в столбце friendship_status_id в таблице friendship
+UPDATE friendship SET friendship_status_id = 
+FLOOR (1 + RAND() * 3);
+
+--7. Обновляем таблицу communities
+--удаляем лишние группы
+DELETE FROM communities WHERE id > 20;
+
+--обновляем столбец community_id в таблице communities_users (значения должны быть не более числа групп)
+UPDATE communities_users SET community_id = FLOOR (1 + RAND() * 20);
+
+
